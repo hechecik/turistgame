@@ -24,18 +24,19 @@
         display: flex; flex-direction: column; align-items: center;
     }
 
-    /* --- MENÜ KATMANI --- */
+    /* MENÜ KATMANI */
     #menu-layer {
         position: absolute; inset: 0; z-index: 2000;
-        background: rgba(0,0,0,0.95);
+        background: rgba(0,0,0,0.98); /* Arka planı koyulaştırdık */
         display: flex; flex-direction: column; align-items: center; justify-content: center;
+        transition: opacity 0.3s;
     }
 
     .title {
-        font-family: 'Orbitron', sans-serif; font-size: 12vw; max-size: 3rem; letter-spacing: 5px;
+        font-family: 'Orbitron', sans-serif; font-size: 10vw; 
         background: linear-gradient(90deg, var(--neon-blue), var(--neon-red));
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 40px; text-align: center;
+        margin-bottom: 30px; text-align: center;
         filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.5));
     }
     @media(min-width: 600px) { .title { font-size: 4rem; } }
@@ -46,11 +47,12 @@
         padding: 20px; border: none; border-radius: 12px;
         font-size: 1.1rem; font-weight: bold; cursor: pointer; color: #fff;
         text-transform: uppercase; letter-spacing: 1px;
-        position: relative; overflow: hidden; transition: transform 0.1s;
+        position: relative; overflow: hidden; transition: transform 0.1s, opacity 0.2s;
     }
     .btn-online { background: linear-gradient(45deg, #0066ff, var(--neon-blue)); box-shadow: 0 0 20px rgba(0,102,255,0.4); }
     .btn-local { background: linear-gradient(45deg, #ff9900, var(--neon-yellow)); box-shadow: 0 0 20px rgba(255,204,0,0.3); color: #000; }
     .btn:active { transform: scale(0.95); opacity: 0.8; }
+    .btn:disabled { filter: grayscale(1); cursor: not-allowed; opacity: 0.5; }
 
     .link-area {
         margin-top: 20px; padding: 20px; background: #222; border-radius: 15px;
@@ -62,7 +64,7 @@
         text-align: center; border-radius: 5px; font-family: monospace; font-size: 1rem;
     }
 
-    /* --- OYUN ALANI --- */
+    /* OYUN ALANI */
     #game-layer {
         display: none; flex-direction: column; align-items: center; width: 100%; height: 100%;
         padding-top: 20px;
@@ -82,7 +84,8 @@
         position: relative; width: 90vmin; height: 90vmin; max-width: 400px; max-height: 400px;
         background: #111; border-radius: 20px;
         box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-        margin-bottom: 20px; touch-action: none; /* Mobilde kaydırmayı engeller */
+        margin-bottom: 20px; 
+        touch-action: none; /* Mobilde sayfanın kaymasını engeller */
     }
 
     svg.lines { width: 100%; height: 100%; position: absolute; pointer-events: none; }
@@ -95,12 +98,13 @@
     }
 
     .piece {
-        position: absolute; width: 15%; height: 15%; /* Board'a göre oranlı */
+        position: absolute; width: 15%; height: 15%;
         border-radius: 50%; z-index: 10; cursor: grab;
         display: flex; align-items: center; justify-content: center;
         box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        touch-action: none;
+        touch-action: none; transition: transform 0.1s;
     }
+    .piece:active { transform: scale(1.1); }
     .piece.red { background: radial-gradient(circle at 30% 30%, #ff5e95, #d60041); border: 2px solid #ff9dbf; box-shadow: 0 0 10px var(--neon-red); }
     .piece.yellow { background: radial-gradient(circle at 30% 30%, #ffd633, #e6b800); border: 2px solid #ffff99; box-shadow: 0 0 10px var(--neon-yellow); }
 
@@ -137,10 +141,10 @@
 
         <div class="link-area" id="link-area">
             <p style="color:#aaa; font-size:0.9rem">Arkadaşına gönder:</p>
-            <input class="link-input" id="share-link" readonly value="Bağlanıyor...">
+            <input class="link-input" id="share-link" readonly value="Oda oluşturuluyor...">
             <button class="btn btn-online" id="btn-copy" style="padding:10px; font-size:0.9rem; margin-top:10px">Linki Kopyala</button>
-            <p id="status-msg" style="color:var(--neon-yellow); margin-top:15px; font-size:0.8rem">Rakip bekleniyor...</p>
-            <button class="btn btn-local" onclick="location.reload()" style="padding:10px; margin-top:20px; background:#333; color:#fff; box-shadow:none">İptal</button>
+            <p id="status-msg" style="color:var(--neon-yellow); margin-top:15px; font-size:0.8rem">Sunucuya bağlanıyor...</p>
+            <button class="btn btn-local" onclick="location.reload()" style="padding:10px; margin-top:20px; background:#333; color:#fff; box-shadow:none">İptal / Menü</button>
         </div>
     </div>
 
@@ -181,26 +185,26 @@
     const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
     
     let mode = 'local';
-    let myRole = 'both'; // local ise ikisi de oynanabilir
+    let myRole = 'both';
     let state = { board:Array(9).fill(null), turn:'R', phase:'placing', placed:{R:0,Y:0}, score:{R:0,Y:0}, winner:null };
-    let peer=null, conn=null;
+    let peer = null, conn = null;
 
-    // --- BAŞLATMA (Safe Init) ---
-    // DOM yüklendiği an butonları aktif et, PeerJS bekleme!
-    document.addEventListener('DOMContentLoaded', () => {
+    // --- BAŞLATMA ---
+    // Sayfa yüklendiğinde SADECE butonları ayarla. İnternete bağlanmaya çalışma.
+    window.onload = () => {
         createSpots();
         
-        // Butonları Bağla
+        // Buton Eventleri
         document.getElementById('btn-local').onclick = startLocal;
-        document.getElementById('btn-online').onclick = startOnline;
+        document.getElementById('btn-online').onclick = initOnlineHost; // Tıklayınca bağlan
         document.getElementById('btn-copy').onclick = copyLink;
 
-        // URL kontrol (Davet linki mi?)
+        // Eğer URL'de ID varsa (davet linki)
         const urlParams = new URLSearchParams(window.location.search);
         if(urlParams.get('id')) {
-            setTimeout(() => startOnline(urlParams.get('id')), 500);
+            initOnlineJoin(urlParams.get('id'));
         }
-    });
+    };
 
     function createSpots() {
         const board = document.getElementById('board');
@@ -211,7 +215,7 @@
         });
     }
 
-    // --- OYUN MODLARI ---
+    // --- YEREL OYUN (Garanti Çalışır) ---
     function startLocal() {
         mode = 'local';
         myRole = 'both';
@@ -220,40 +224,62 @@
         render();
     }
 
-    function startOnline(joinId = null) {
-        if(typeof Peer === 'undefined') { alert("Online mod için internet gerekli!"); return; }
+    // --- ONLINE OYUN (Sadece tıklanınca çalışır) ---
+    function initOnlineHost() {
+        if(typeof Peer === 'undefined') { alert("Bağlantı kütüphanesi yüklenemedi. İnternetini kontrol et."); return; }
         
-        mode = 'online';
+        // Arayüzü hazırla
         document.getElementById('main-btns').style.display='none';
+        document.getElementById('link-area').style.display='flex';
         
-        // PeerJS Başlatma
-        peer = new Peer(null, {debug:1});
-        const status = document.getElementById('status-msg');
-
-        if(typeof joinId === 'string') {
-            // JOINER
-            status.style.display='block'; status.innerText="Bağlanıyor...";
-            document.getElementById('menu-layer').appendChild(status);
-            peer.on('open', ()=>{
-                conn = peer.connect(joinId);
-                setupConn();
-            });
-        } else {
-            // HOST
-            document.getElementById('link-area').style.display='flex';
-            peer.on('open', (id)=>{
+        try {
+            peer = new Peer(null, {debug:1});
+            
+            peer.on('open', (id) => {
                 document.getElementById('share-link').value = window.location.origin + window.location.pathname + '?id=' + id;
+                document.getElementById('status-msg').innerText = "Rakip bekleniyor...";
             });
-            peer.on('connection', (c)=>{
-                conn = c; setupConn();
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConn();
                 myRole='R';
-                status.innerText="Rakip geldi! Başlıyor...";
+                document.getElementById('status-msg').innerText = "BAĞLANDI! Başlıyor...";
                 setTimeout(()=>{
                     document.getElementById('menu-layer').style.display='none';
                     document.getElementById('game-layer').style.display='flex';
+                    mode='online';
                     sendState(); render();
-                },1000);
+                }, 1000);
             });
+            
+            peer.on('error', (err) => { alert("Hata: " + err); location.reload(); });
+
+        } catch(e) {
+            alert("Sunucu hatası. Yerel oynamayı dene.");
+            location.reload();
+        }
+    }
+
+    function initOnlineJoin(hostId) {
+        if(typeof Peer === 'undefined') return;
+        
+        // Joiner arayüzü
+        document.getElementById('main-btns').style.display='none';
+        const status = document.createElement('div');
+        status.innerText = "Odaya Katılınıyor...";
+        status.style.marginTop = "20px";
+        document.getElementById('menu-layer').appendChild(status);
+
+        try {
+            peer = new Peer(null, {debug:1});
+            peer.on('open', () => {
+                conn = peer.connect(hostId);
+                setupConn();
+            });
+            peer.on('error', (err) => { alert("Oda bulunamadı veya kapalı."); window.location.href = window.location.pathname; });
+        } catch(e) {
+            console.log(e);
         }
     }
 
@@ -262,34 +288,36 @@
         conn.on('data', (d)=>{
             if(d.type==='state') {
                 state = d.val;
-                if(mode==='online' && myRole==='both') { // İlk veri gelince Joiner rolünü al
-                    myRole='Y';
+                if(mode==='local') { // İlk bağlantıda modu değiştir
+                    mode='online';
+                    myRole='Y'; // Veriyi alan Joiner'dir
                     document.getElementById('menu-layer').style.display='none';
                     document.getElementById('game-layer').style.display='flex';
                 }
                 render();
             }
         });
-        conn.on('close', ()=> alert("Bağlantı koptu"));
+        conn.on('close', ()=> { alert("Rakip oyundan düştü."); location.reload(); });
     }
 
     function sendState() { if(conn && conn.open) conn.send({type:'state', val:state}); }
 
-    // --- OYUN MANTIĞI & RENDER ---
+    // --- OYUN MOTORU ---
     function render() {
-        // HUD
         document.getElementById('p1-stat').classList.toggle('active', state.turn==='R');
         document.getElementById('p2-stat').classList.toggle('active', state.turn==='Y');
         document.getElementById('s1').innerText=state.score.R; document.getElementById('s2').innerText=state.score.Y;
-        document.getElementById('turn-text').innerText = (mode==='online' && state.turn!==myRole) ? "RAKİP BEKLENİYOR" : "SIRA SENDE";
+        
+        let turnMsg = "";
+        if(mode === 'local') turnMsg = state.turn === 'R' ? "SIRA: KIRMIZI" : "SIRA: SARI";
+        else turnMsg = (state.turn === myRole) ? "SIRA SENDE" : "RAKİP BEKLENİYOR";
+        document.getElementById('turn-text').innerText = turnMsg;
 
-        // Taşları Temizle ve Çiz
+        // Taşları Çiz
         document.querySelectorAll('.piece').forEach(p=>p.remove());
         
-        // Sahadaki Taşlar
         state.board.forEach((o,i)=>{ if(o) createPiece(o, i); });
         
-        // Havuzdaki Taşlar
         for(let i=0; i<(3-state.placed.R); i++) createPiece('R', -1);
         for(let i=0; i<(3-state.placed.Y); i++) createPiece('Y', -1);
 
@@ -312,34 +340,45 @@
             document.getElementById('board').appendChild(p);
         }
 
-        // Etkileşim
-        let interact = (mode==='local' || (mode==='online' && myRole===owner));
-        if(interact && state.turn===owner && !state.winner) {
+        // Etkileşim Kontrolü
+        let canInteract = false;
+        if(!state.winner && state.turn === owner) {
+            if(mode === 'local') canInteract = true;
+            else if(mode === 'online' && myRole === owner) canInteract = true;
+        }
+
+        if(canInteract) {
             p.onmousedown = p.ontouchstart = (e)=>startDrag(e, p, idx, owner);
         } else {
             p.style.cursor='default';
         }
     }
 
-    // --- SÜRÜKLE BIRAK (Fixed Logic) ---
+    // --- FİZİK MOTORU (Mobilde Kayma Sorunu Giderilmiş) ---
     let dragged=null, dragOff={x:0,y:0};
 
     function startDrag(e, el, idx, owner) {
-        if(state.phase==='moving' && idx===-1) return; // Hareket fazında havuzdan alma yasak
-        e.preventDefault();
+        if(state.phase==='moving' && idx===-1) return;
         
+        // Touch/Mouse ayrımı
         let pt = e.touches ? e.touches[0] : e;
+        // Mobilde sayfayı kaydırmayı engellemek için preventDefault şart
+        if(e.cancelable) e.preventDefault(); 
+        
         dragged = el;
         let rect = el.getBoundingClientRect();
         dragOff = {x: pt.clientX-rect.left, y: pt.clientY-rect.top};
 
-        // Fixed moda al
         el.style.position='fixed'; el.style.width=rect.width+'px'; el.style.height=rect.height+'px';
         el.style.zIndex=1000; el.style.transform='none';
         document.body.appendChild(el);
+        
         moveDrag(pt);
 
-        let move = (ev)=> moveDrag(ev.touches?ev.touches[0]:ev);
+        let move = (ev)=> {
+            if(ev.cancelable) ev.preventDefault();
+            moveDrag(ev.touches?ev.touches[0]:ev);
+        };
         let end = (ev)=> {
             document.removeEventListener('mousemove', move); document.removeEventListener('touchmove', move);
             document.removeEventListener('mouseup', end); document.removeEventListener('touchend', end);
@@ -357,11 +396,59 @@
     }
 
     function finishDrag(el, oldIdx, owner) {
-        // En yakın spotu bul
+        // Hedef bulma
         let r = el.getBoundingClientRect();
         let c = {x:r.left+r.width/2, y:r.top+r.height/2};
         let closest = -1, minD = 9999;
 
         document.querySelectorAll('.spot').forEach(s=>{
             let sr = s.getBoundingClientRect();
-            let sc = {x:sr.left+sr.width/2, y:sr
+            let sc = {x:sr.left+sr.width/2, y:sr.top+sr.height/2};
+            let d = Math.hypot(c.x-sc.x, c.y-sc.y);
+            // Spot genişliği kadar tolerans
+            if(d < r.width) { 
+                if(d < minD) { minD=d; closest=parseInt(s.dataset.idx); }
+            }
+        });
+
+        let valid = false;
+        if(closest!==-1 && state.board[closest]===null) {
+            if(state.phase==='placing' && oldIdx===-1) valid=true;
+            else if(state.phase==='moving' && oldIdx!==-1 && adj[oldIdx].includes(closest)) valid=true;
+        }
+
+        if(valid) {
+            if(oldIdx!==-1) state.board[oldIdx]=null;
+            state.board[closest]=owner;
+            if(state.phase==='placing' && oldIdx===-1) state.placed[owner]++;
+            
+            if(state.placed.R===3 && state.placed.Y===3) state.phase='moving';
+            
+            let win = wins.some(w=> w.every(i=> state.board[i]===owner));
+            if(win) {
+                state.score[owner]++; state.winner=owner;
+            } else {
+                state.turn = owner==='R'?'Y':'R';
+                // Beraberlik kontrolü
+                if(state.phase==='moving') {
+                    let pMoves = state.board.map((x,i)=>x===state.turn?i:-1).filter(x=>x!==-1);
+                    if(!pMoves.some(i=> adj[i].some(n=> state.board[n]===null))) state.winner='DRAW';
+                }
+            }
+            if(mode==='online') sendState();
+            render();
+        } else {
+            render(); // Hatalıysa eski yerine
+        }
+        dragged=null;
+    }
+
+    function copyLink() {
+        document.getElementById('share-link').select();
+        document.execCommand('copy');
+        let t = document.getElementById('toast');
+        t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 2000);
+    }
+</script>
+</body>
+</html>
