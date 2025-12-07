@@ -390,4 +390,97 @@
         }
 
         if(canInteract) {
-            p.
+            p.onmousedown = p.ontouchstart = (e)=>startDrag(e, p, idx, owner);
+            p.style.cursor = 'grab';
+        } else {
+            p.style.cursor='default';
+        }
+    }
+
+    /* --- FİZİK (SÜRÜKLE BIRAK) --- */
+    let dragged=null, dragOff={x:0,y:0};
+
+    function startDrag(e, el, idx, owner) {
+        if(state.phase==='moving' && idx===-1) return;
+        
+        let pt = e.touches ? e.touches[0] : e;
+        if(e.cancelable) e.preventDefault();
+        
+        dragged = el;
+        let rect = el.getBoundingClientRect();
+        dragOff = {x: pt.clientX-rect.left, y: pt.clientY-rect.top};
+
+        el.style.position='fixed'; el.style.width=rect.width+'px'; el.style.height=rect.height+'px';
+        el.style.zIndex=1000; el.style.transform='none';
+        document.body.appendChild(el);
+        moveDrag(pt);
+
+        let move = (ev)=> { if(ev.cancelable) ev.preventDefault(); moveDrag(ev.touches?ev.touches[0]:ev); };
+        let end = (ev)=> {
+            document.removeEventListener('mousemove', move); document.removeEventListener('touchmove', move);
+            document.removeEventListener('mouseup', end); document.removeEventListener('touchend', end);
+            finishDrag(el, idx, owner);
+        };
+        document.addEventListener('mousemove', move); document.addEventListener('touchmove', move, {passive:false});
+        document.addEventListener('mouseup', end); document.addEventListener('touchend', end);
+    }
+
+    function moveDrag(pt) {
+        if(dragged) {
+            dragged.style.left = (pt.clientX - dragOff.x) + 'px';
+            dragged.style.top = (pt.clientY - dragOff.y) + 'px';
+        }
+    }
+
+    function finishDrag(el, oldIdx, owner) {
+        let r = el.getBoundingClientRect();
+        let c = {x:r.left+r.width/2, y:r.top+r.height/2};
+        let closest = -1, minD = 9999;
+
+        document.querySelectorAll('.spot').forEach(s=>{
+            let sr = s.getBoundingClientRect();
+            let sc = {x:sr.left+sr.width/2, y:sr.top+sr.height/2};
+            let d = Math.hypot(c.x-sc.x, c.y-sc.y);
+            if(d < r.width) { if(d < minD) { minD=d; closest=parseInt(s.dataset.idx); } }
+        });
+
+        let valid = false;
+        if(closest!==-1 && state.board[closest]===null) {
+            if(state.phase==='placing' && oldIdx===-1) valid=true;
+            else if(state.phase==='moving' && oldIdx!==-1 && adj[oldIdx].includes(closest)) valid=true;
+        }
+
+        if(valid) {
+            if(oldIdx!==-1) state.board[oldIdx]=null;
+            state.board[closest]=owner;
+            if(state.phase==='placing' && oldIdx===-1) state.placed[owner]++;
+            
+            if(state.placed.R===3 && state.placed.Y===3) state.phase='moving';
+            
+            let win = wins.some(w=> w.every(i=> state.board[i]===owner));
+            if(win) {
+                state.score[owner]++; state.winner=owner;
+            } else {
+                state.turn = owner==='R'?'Y':'R';
+                if(state.phase==='moving') {
+                    let pMoves = state.board.map((x,i)=>x===state.turn?i:-1).filter(x=>x!==-1);
+                    if(!pMoves.some(i=> adj[i].some(n=> state.board[n]===null))) state.winner='DRAW';
+                }
+            }
+            if(mode==='online') sendState();
+            render();
+        } else {
+            render();
+        }
+        dragged=null;
+    }
+
+    function copyLink() {
+        document.getElementById('share-link').select();
+        document.execCommand('copy');
+        let t = document.getElementById('toast');
+        t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 2000);
+    }
+</script>
+</body>
+</html>
