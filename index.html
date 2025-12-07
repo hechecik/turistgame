@@ -10,8 +10,8 @@
 
     :root {
         --bg-color: #050505;
-        --neon-g: #ff0055; /* G - Kırmızı */
-        --neon-n: #ffcc00; /* N - Sarı */
+        --neon-g: #ff0055; /* Kırmızı */
+        --neon-n: #ffcc00; /* Sarı */
         --neon-blue: #00f3ff;
         --glass: rgba(255, 255, 255, 0.08);
     }
@@ -25,7 +25,7 @@
         display: flex; flex-direction: column; align-items: center;
     }
 
-    /* --- MENÜ --- */
+    /* MENÜ KATMANI */
     #menu-layer {
         position: absolute; inset: 0; z-index: 2000;
         background: rgba(0,0,0,0.98);
@@ -41,6 +41,7 @@
     }
     .subtitle { font-size: 1rem; color: #888; letter-spacing: 4px; margin-bottom: 50px; }
 
+    /* Butonlar */
     .btn {
         padding: 20px; width: 80%; max-width: 300px; margin: 10px;
         border: none; border-radius: 50px; font-size: 1.1rem; font-weight: bold;
@@ -51,6 +52,7 @@
     .btn-local { background: transparent; border: 2px solid #444; color: #aaa; }
     .btn:active { transform: scale(0.95); }
 
+    /* Bağlantı Alanı */
     .link-area {
         display: none; flex-direction: column; align-items: center; gap: 15px; width: 90%; max-width: 400px;
         background: #111; padding: 25px; border-radius: 20px; border: 1px solid #333;
@@ -59,8 +61,11 @@
         width: 100%; padding: 15px; background: #000; border: 1px solid var(--neon-blue);
         color: var(--neon-blue); text-align: center; border-radius: 10px; font-family: monospace;
     }
+    #debug-log {
+        margin-top: 20px; font-size: 0.8rem; color: #555; font-family: monospace;
+    }
 
-    /* --- OYUN ALANI --- */
+    /* OYUN ALANI */
     #game-layer {
         display: none; flex-direction: column; align-items: center; width: 100%; height: 100%;
         padding-top: 20px;
@@ -81,7 +86,7 @@
         background: #111; border-radius: 20px;
         box-shadow: 0 0 50px rgba(0,0,0,0.5);
         border: 1px solid #333; margin-bottom: 20px;
-        touch-action: none; /* Mobilde kaydırmayı engeller */
+        touch-action: none; 
     }
 
     svg.lines { width: 100%; height: 100%; position: absolute; pointer-events: none; }
@@ -92,7 +97,7 @@
         transform: translate(-50%, -50%); border-radius: 50%; z-index: 5;
     }
 
-    /* TAŞLAR (G ve N) */
+    /* TAŞLAR */
     .piece {
         position: absolute; width: 16%; height: 16%;
         border-radius: 50%; z-index: 10; cursor: grab;
@@ -121,7 +126,7 @@
     .modal h2 { font-size: 2.5rem; margin: 0; }
     .toast {
         position: fixed; top: 20px; background: #222; color: var(--neon-blue); padding: 10px 20px;
-        border-radius: 20px; opacity: 0; transition: 0.3s; border: 1px solid var(--neon-blue);
+        border-radius: 20px; opacity: 0; transition: 0.3s; border: 1px solid var(--neon-blue); z-index: 5000;
     }
 </style>
 </head>
@@ -140,8 +145,10 @@
             <p style="color:#aaa; margin:0">Bu linki rakibine at:</p>
             <input class="link-input" id="share-link" readonly value="Bağlanıyor...">
             <button class="btn btn-create" id="btn-copy" style="padding:15px; font-size:1rem; width:100%">Kopyala</button>
-            <p id="status-msg" style="color:var(--neon-n); margin-top:10px">Rakip Bekleniyor...</p>
+            <p id="status-msg" style="color:var(--neon-n); margin-top:10px">Sunucuya bağlanıyor...</p>
+            <button class="btn btn-local" onclick="location.reload()" style="margin-top:20px; font-size:0.8rem; padding:10px">İptal</button>
         </div>
+        <div id="debug-log"></div>
     </div>
 
     <div id="game-layer">
@@ -172,8 +179,8 @@
     </div>
 
     <div class="modal" id="disc-modal">
-        <h2 style="color:#888; font-size:1.5rem">Rakip Ayrıldı</h2>
-        <button class="btn btn-create" onclick="location.reload()">Yeni Link Al</button>
+        <h2 style="color:#888; font-size:1.5rem">Bağlantı Koptu</h2>
+        <button class="btn btn-create" onclick="location.reload()">Ana Menü</button>
     </div>
 
     <div class="toast" id="toast">Kopyalandı!</div>
@@ -189,20 +196,28 @@
     let state = { board:Array(9).fill(null), turn:'R', phase:'placing', placed:{R:0,Y:0}, score:{R:0,Y:0}, winner:null };
     let peer = null, conn = null;
 
+    function log(msg) {
+        document.getElementById('debug-log').innerText = msg;
+        console.log(msg);
+    }
+
     /* --- YÜKLEME --- */
-    window.onload = () => {
+    window.addEventListener('load', () => {
         createSpots();
         
-        // Butonları Bağla
+        // Butonları Güvenli Bağla
         document.getElementById('btn-local').onclick = startLocal;
         document.getElementById('btn-online').onclick = initHost;
         document.getElementById('btn-copy').onclick = copyLink;
         document.getElementById('btn-next').onclick = nextRound;
 
-        // Link ile gelindiyse
+        // URL Kontrolü
         const urlParams = new URLSearchParams(window.location.search);
-        if(urlParams.get('id')) initJoin(urlParams.get('id'));
-    };
+        if(urlParams.get('id')) {
+            // Join modunda aç
+            setTimeout(() => initJoin(urlParams.get('id')), 500);
+        }
+    });
 
     function createSpots() {
         const board = document.getElementById('board');
@@ -213,7 +228,7 @@
         });
     }
 
-    /* --- BAŞLATMA FONKSİYONLARI --- */
+    /* --- BAŞLATMA --- */
     function startLocal() {
         mode = 'local';
         myRole = 'both';
@@ -222,46 +237,86 @@
         render();
     }
 
+    /* --- ONLINE BAĞLANTI (Google STUN Ekli) --- */
+    function getPeerConfig() {
+        return {
+            debug: 1,
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
+                ]
+            }
+        };
+    }
+
     function initHost() {
-        if(typeof Peer === 'undefined') { alert("İnternet bağlantısı yok!"); return; }
-        
         document.getElementById('main-btns').style.display='none';
         document.getElementById('link-area').style.display='flex';
+        log("Sunucu başlatılıyor...");
 
-        peer = new Peer(null, {debug:1});
-        peer.on('open', id => {
-            document.getElementById('share-link').value = window.location.origin + window.location.pathname + '?id=' + id;
-        });
-        peer.on('connection', c => {
-            conn = c; setupConn();
-            myRole = 'R';
-            document.getElementById('status-msg').innerText = "BAĞLANDI!";
-            setTimeout(() => {
-                document.getElementById('menu-layer').style.display='none';
-                document.getElementById('game-layer').style.display='flex';
-                sendState(); render();
-            }, 1000);
-        });
-        peer.on('error', err => alert("Bağlantı Hatası: " + err));
+        try {
+            peer = new Peer(null, getPeerConfig());
+            
+            peer.on('open', id => {
+                log("ID Alındı: " + id);
+                document.getElementById('share-link').value = window.location.origin + window.location.pathname + '?id=' + id;
+                document.getElementById('status-msg').innerText = "Rakip Bekleniyor...";
+            });
+
+            peer.on('connection', c => {
+                log("Rakip bağlandı!");
+                conn = c; setupConn();
+                myRole = 'R';
+                document.getElementById('status-msg').innerText = "BAŞLATILIYOR!";
+                setTimeout(() => {
+                    document.getElementById('menu-layer').style.display='none';
+                    document.getElementById('game-layer').style.display='flex';
+                    sendState(); render();
+                }, 1000);
+            });
+
+            peer.on('error', err => {
+                log("Hata: " + err);
+                alert("Bağlantı hatası. Sayfayı yenileyip tekrar dene.");
+            });
+            
+        } catch(e) {
+            log("Kritik Hata: " + e);
+        }
     }
 
     function initJoin(id) {
         document.getElementById('main-btns').style.display='none';
+        log("Odaya bağlanılıyor: " + id);
+        
         const msg = document.createElement('div');
-        msg.innerText = "ODAYA KATILINIYOR...";
+        msg.innerText = "BAĞLANIYOR...";
         msg.style.color = "var(--neon-blue)"; msg.style.marginTop="20px";
         document.getElementById('menu-layer').appendChild(msg);
 
-        peer = new Peer(null, {debug:1});
-        peer.on('open', () => {
-            conn = peer.connect(id);
-            setupConn();
-        });
-        peer.on('error', () => { alert("Link geçersiz veya oda kapalı."); window.location.href = window.location.pathname; });
+        try {
+            peer = new Peer(null, getPeerConfig());
+            
+            peer.on('open', myId => {
+                log("Katılımcı ID: " + myId);
+                conn = peer.connect(id);
+                setupConn();
+            });
+
+            peer.on('error', err => {
+                log("Bağlantı başarısız: " + err);
+                alert("Oda bulunamadı veya kapalı.");
+                window.location.href = window.location.pathname;
+            });
+
+        } catch(e) {
+            log("Join Hatası: " + e);
+        }
     }
 
     function setupConn() {
-        conn.on('open', () => console.log("Bağlı"));
+        conn.on('open', () => log("Veri kanalı açık"));
         conn.on('data', d => {
             if(d.type === 'state') {
                 state = d.val;
@@ -295,20 +350,161 @@
         state.phase = 'placing';
         state.placed = {R:0, Y:0};
         state.winner = null;
-        state.turn = 'R'; // Her tur G başlar
+        state.turn = 'R'; 
         document.getElementById('end-modal').style.display='none';
     }
 
     function sendState() { if(conn && conn.open) conn.send({type:'state', val:state}); }
 
     function render() {
-        // Skorlar
         document.getElementById('s1').innerText = state.score.R;
         document.getElementById('s2').innerText = state.score.Y;
-        
-        // Sıra Göstergesi
         document.getElementById('p1-stat').classList.toggle('active', state.turn==='R');
         document.getElementById('p2-stat').classList.toggle('active', state.turn==='Y');
         
         let txt = "";
-        if(mode === 'online') txt = (state.turn === myRole) ? "S
+        if(mode === 'online') txt = (state.turn === myRole) ? "SIRA SENDE" : "RAKİP BEKLENİYOR";
+        else txt = state.turn === 'R' ? "SIRA: G" : "SIRA: N";
+        document.getElementById('turn-text').innerText = txt;
+
+        document.querySelectorAll('.piece').forEach(p => p.remove());
+        state.board.forEach((o,i) => { if(o) createPiece(o, i); });
+        for(let i=0; i<(3-state.placed.R); i++) createPiece('R', -1);
+        for(let i=0; i<(3-state.placed.Y); i++) createPiece('Y', -1);
+
+        if(state.winner) {
+            const msg = document.getElementById('end-msg');
+            if(state.winner === 'DRAW') {
+                msg.innerText = "BERABERE!";
+                msg.style.color = "#fff";
+            } else {
+                msg.innerText = (state.winner==='R' ? "G" : "N") + " KAZANDI!";
+                msg.style.color = state.winner==='R' ? "var(--neon-g)" : "var(--neon-n)";
+            }
+            document.getElementById('end-modal').style.display='flex';
+        } else {
+            document.getElementById('end-modal').style.display='none';
+        }
+    }
+
+    function createPiece(owner, idx) {
+        let p = document.createElement('div');
+        p.className = `piece ${owner==='R'?'red':'yellow'}`;
+        
+        if(idx === -1) {
+            p.style.position = 'relative'; 
+            p.style.width = '50px'; p.style.height = '50px';
+            document.getElementById(`pool-${owner}`).appendChild(p);
+        } else {
+            p.style.left = pos[idx].l + '%'; p.style.top = pos[idx].t + '%';
+            p.style.transform = 'translate(-50%, -50%)';
+            document.getElementById('board').appendChild(p);
+        }
+
+        let canInteract = false;
+        if(!state.winner && state.turn === owner) {
+            if(mode === 'local') canInteract = true;
+            else if(mode === 'online' && myRole === owner) canInteract = true;
+        }
+
+        if(canInteract) {
+            p.onmousedown = p.ontouchstart = (e) => startDrag(e, p, idx, owner);
+            p.style.cursor = 'grab';
+        } else {
+            p.style.cursor = 'default';
+        }
+    }
+
+    /* --- SÜRÜKLE BIRAK --- */
+    let dragged = null;
+    let dragOff = {x:0, y:0};
+
+    function startDrag(e, el, idx, owner) {
+        if(state.phase === 'moving' && idx === -1) return;
+
+        e.preventDefault(); 
+        let pt = e.touches ? e.touches[0] : e;
+        
+        dragged = el;
+        let rect = el.getBoundingClientRect();
+        dragOff = {x: pt.clientX - rect.left, y: pt.clientY - rect.top};
+
+        el.style.position = 'fixed'; 
+        el.style.width = rect.width + 'px'; el.style.height = rect.height + 'px';
+        el.style.zIndex = 1000; el.style.transform = 'none';
+        document.body.appendChild(el);
+        
+        moveDrag(pt);
+
+        const move = (ev) => { if(ev.cancelable) ev.preventDefault(); moveDrag(ev.touches?ev.touches[0]:ev); };
+        const end = () => {
+            document.removeEventListener('mousemove', move); document.removeEventListener('touchmove', move);
+            document.removeEventListener('mouseup', end); document.removeEventListener('touchend', end);
+            finishDrag(el, idx, owner);
+        };
+        
+        document.addEventListener('mousemove', move); document.addEventListener('touchmove', move, {passive:false});
+        document.addEventListener('mouseup', end); document.addEventListener('touchend', end);
+    }
+
+    function moveDrag(pt) {
+        if(dragged) {
+            dragged.style.left = (pt.clientX - dragOff.x) + 'px';
+            dragged.style.top = (pt.clientY - dragOff.y) + 'px';
+        }
+    }
+
+    function finishDrag(el, oldIdx, owner) {
+        let r = el.getBoundingClientRect();
+        let c = {x: r.left + r.width/2, y: r.top + r.height/2};
+        let closest = -1, minD = 9999;
+
+        document.querySelectorAll('.spot').forEach(s => {
+            let sr = s.getBoundingClientRect();
+            let sc = {x: sr.left + sr.width/2, y: sr.top + sr.height/2};
+            let d = Math.hypot(c.x - sc.x, c.y - sc.y);
+            if(d < r.width) { 
+                if(d < minD) { minD = d; closest = parseInt(s.dataset.idx); }
+            }
+        });
+
+        let valid = false;
+        if(closest !== -1 && state.board[closest] === null) {
+            if(state.phase === 'placing' && oldIdx === -1) valid = true;
+            else if(state.phase === 'moving' && oldIdx !== -1 && adj[oldIdx].includes(closest)) valid = true;
+        }
+
+        if(valid) {
+            if(oldIdx !== -1) state.board[oldIdx] = null;
+            state.board[closest] = owner;
+            if(state.phase === 'placing' && oldIdx === -1) state.placed[owner]++;
+            
+            if(state.placed.R === 3 && state.placed.Y === 3) state.phase = 'moving';
+            
+            let win = wins.some(w => w.every(i => state.board[i] === owner));
+            if(win) {
+                state.score[owner]++; state.winner = owner;
+            } else {
+                state.turn = (owner === 'R') ? 'Y' : 'R';
+                if(state.phase === 'moving') {
+                    let pMoves = state.board.map((x,i) => x===state.turn ? i : -1).filter(x=>x!==-1);
+                    if(!pMoves.some(i => adj[i].some(n => state.board[n]===null))) state.winner='DRAW';
+                }
+            }
+            if(mode === 'online') sendState();
+            render();
+        } else {
+            render();
+        }
+        dragged = null;
+    }
+
+    function copyLink() {
+        document.getElementById('share-link').select();
+        document.execCommand('copy');
+        let t = document.getElementById('toast');
+        t.style.opacity = 1; setTimeout(() => t.style.opacity = 0, 2000);
+    }
+</script>
+</body>
+</html>
