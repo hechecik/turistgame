@@ -4,13 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>TURİST: Neon Arena</title>
-<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Roboto:wght@400;500&display=swap');
 
     :root {
         --bg-dark: #050505;
-        --panel-bg: #1a1a1a;
         --neon-red: #ff0055;
         --neon-yellow: #ffcc00;
         --neon-blue: #00f3ff;
@@ -25,12 +23,19 @@
         display: flex; flex-direction: column; align-items: center;
     }
 
-    /* --- GİRİŞ MENÜSÜ --- */
+    /* --- LOADING SCREEN --- */
+    #loader {
+        position: fixed; inset: 0; z-index: 9999; background: #000;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--neon-blue); font-family: 'Orbitron'; animation: pulse 1s infinite;
+    }
+
+    /* --- MENÜ --- */
     #menu-layer {
         position: absolute; inset: 0; z-index: 2000;
         background: rgba(0,0,0,0.95);
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        transition: opacity 0.5s;
+        transition: opacity 0.3s;
     }
 
     .title {
@@ -41,17 +46,18 @@
         filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.5));
     }
 
-    .btn-group { display: flex; flex-direction: column; gap: 15px; width: 80%; max-width: 300px; }
+    .btn-group { display: flex; flex-direction: column; gap: 20px; width: 80%; max-width: 300px; }
 
     .btn {
-        padding: 18px; border: none; border-radius: 12px;
+        padding: 20px; border: none; border-radius: 12px;
         font-size: 1.1rem; font-weight: bold; cursor: pointer; color: #fff;
-        transition: transform 0.2s, box-shadow 0.2s;
         text-transform: uppercase; letter-spacing: 1px;
+        position: relative; overflow: hidden;
     }
-    .btn-online { background: linear-gradient(45deg, #0066ff, var(--neon-blue)); box-shadow: 0 0 15px rgba(0,102,255,0.4); }
-    .btn-local { background: linear-gradient(45deg, #ff9900, var(--neon-yellow)); box-shadow: 0 0 15px rgba(255,204,0,0.3); color: #000; }
-    .btn:active { transform: scale(0.96); }
+    .btn-online { background: linear-gradient(45deg, #0066ff, var(--neon-blue)); box-shadow: 0 0 20px rgba(0,102,255,0.4); }
+    .btn-local { background: linear-gradient(45deg, #ff9900, var(--neon-yellow)); box-shadow: 0 0 20px rgba(255,204,0,0.3); color: #000; }
+    
+    .btn:active { transform: scale(0.95); opacity: 0.8; }
 
     .link-area {
         margin-top: 20px; padding: 20px; background: #222; border-radius: 15px;
@@ -59,8 +65,8 @@
         border: 1px solid #444;
     }
     .link-input {
-        width: 100%; padding: 10px; background: #000; border: 1px solid #555; color: var(--neon-blue);
-        text-align: center; border-radius: 5px; font-family: monospace;
+        width: 100%; padding: 15px; background: #000; border: 1px solid #555; color: var(--neon-blue);
+        text-align: center; border-radius: 5px; font-family: monospace; font-size: 1rem;
     }
 
     /* --- OYUN ALANI --- */
@@ -91,12 +97,11 @@
     svg.lines { width: 100%; height: 100%; position: absolute; pointer-events: none; }
     line { stroke: #333; stroke-width: 6; stroke-linecap: round; }
 
-    /* Noktalar (Görünmez Hedefler) */
+    /* Noktalar */
     .spot {
         position: absolute; width: 60px; height: 60px;
         transform: translate(-50%, -50%); border-radius: 50%;
         z-index: 5;
-        /* border: 1px solid rgba(255,255,255,0.1); Debug için açılabilir */
     }
 
     /* Taşlar */
@@ -105,19 +110,12 @@
         border-radius: 50%; z-index: 10; cursor: grab;
         display: flex; align-items: center; justify-content: center;
         box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        touch-action: none;
-        transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+        touch-action: none; /* Mobilde scroll engelleme */
     }
-    .piece.dragging {
-        transition: none; /* Sürüklerken animasyonu kapat */
-        z-index: 100; transform: scale(1.2);
-        pointer-events: none; /* Altındaki spotu görebilmek için */
-    }
-
     .piece.red { background: radial-gradient(circle at 30% 30%, #ff5e95, #d60041); border: 2px solid #ff9dbf; box-shadow: 0 0 10px var(--neon-red); }
     .piece.yellow { background: radial-gradient(circle at 30% 30%, #ffd633, #e6b800); border: 2px solid #ffff99; box-shadow: 0 0 10px var(--neon-yellow); }
 
-    /* Taş Havuzları */
+    /* Havuzlar */
     .pools {
         display: flex; width: 90%; max-width: 400px; justify-content: space-between; height: 70px;
     }
@@ -126,37 +124,39 @@
         position: relative; display: flex; justify-content: center; align-items: center;
     }
 
-    /* Bildirimler */
-    .toast {
-        position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-        background: #333; color: #fff; padding: 10px 20px; border-radius: 20px;
-        opacity: 0; pointer-events: none; transition: 0.3s; z-index: 5000; font-size: 0.9rem;
-    }
-
+    /* Modal & Toast */
     .modal {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+        position: fixed; inset: 0; background: rgba(0,0,0,0.95);
         display: none; align-items: center; justify-content: center; z-index: 3000;
     }
     .modal-content {
-        background: #222; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444;
+        background: #222; padding: 30px; border-radius: 20px; text-align: center; border: 1px solid #444; width: 80%;
     }
-    h2 { color: var(--neon-blue); margin-top: 0; }
+    .toast {
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+        background: #333; color: #fff; padding: 10px 20px; border-radius: 20px;
+        opacity: 0; pointer-events: none; transition: 0.3s; z-index: 5000;
+    }
+    @keyframes pulse { 0% { opacity:0.5; } 50% { opacity:1; } 100% { opacity:0.5; } }
 </style>
 </head>
 <body>
 
+    <div id="loader">YÜKLENİYOR...</div>
+
     <div id="menu-layer">
         <div class="title">TURİST</div>
         <div class="btn-group" id="main-btns">
-            <button class="btn btn-online" onclick="setupOnline()">Online Oyna (Link)</button>
-            <button class="btn btn-local" onclick="startLocalGame()">Aynı Cihazda Oyna</button>
+            <button class="btn btn-online" id="btn-online">Online Oyna (Link)</button>
+            <button class="btn btn-local" id="btn-local">Aynı Cihazda Oyna</button>
         </div>
 
         <div class="link-area" id="link-area">
-            <p style="color:#aaa; font-size:0.9rem">Bu linki arkadaşına gönder:</p>
+            <p style="color:#aaa; font-size:0.9rem">Arkadaşına gönder:</p>
             <input class="link-input" id="share-link" readonly value="Bağlanıyor...">
-            <button class="btn btn-online" onclick="copyLink()" style="padding:10px; font-size:0.9rem; margin-top:10px">Kopyala</button>
-            <p id="status-msg" style="color:var(--neon-yellow); animation: blink 1s infinite">Rakip bekleniyor...</p>
+            <button class="btn btn-online" id="btn-copy" style="padding:10px; font-size:0.9rem; margin-top:10px">Linki Kopyala</button>
+            <p id="status-msg" style="color:var(--neon-yellow); margin-top:15px; font-size:0.8rem">Rakip bekleniyor...</p>
+            <button class="btn btn-local" onclick="location.reload()" style="padding:10px; margin-top:20px; background:#333; color:#fff; box-shadow:none">İptal</button>
         </div>
     </div>
 
@@ -166,7 +166,7 @@
                 <span class="p-name">KIRMIZI</span>
                 <span class="p-score" id="s1">0</span>
             </div>
-            <div style="display:flex; align-items:center; font-size:0.8rem; opacity:0.5" id="turn-text">SIRA SENDE</div>
+            <div style="display:flex; align-items:center; font-size:0.7rem; opacity:0.6" id="turn-text">HAZIR</div>
             <div class="player-stat c-yellow" id="p2-stat">
                 <span class="p-name">SARI</span>
                 <span class="p-score" id="s2">0</span>
@@ -184,7 +184,7 @@
                 <line x1="10%" y1="10%" x2="90%" y2="90%"/>
                 <line x1="90%" y1="10%" x2="10%" y2="90%"/>
             </svg>
-            </div>
+        </div>
 
         <div class="pools">
             <div class="pool" id="pool-R"></div>
@@ -194,15 +194,18 @@
 
     <div class="modal" id="end-modal">
         <div class="modal-content">
-            <h2 id="end-msg">OYUN BİTTİ</h2>
-            <button class="btn btn-online" onclick="restartRequest()">Tekrar Oyna</button>
+            <h2 id="end-msg" style="color:var(--neon-blue)">OYUN BİTTİ</h2>
+            <button class="btn btn-online" onclick="restartRequest()" style="padding:15px; width:100%">Tekrar Oyna</button>
+            <button class="btn btn-local" onclick="location.reload()" style="padding:15px; width:100%; margin-top:10px; background:#333; color:#fff; box-shadow:none">Menüye Dön</button>
         </div>
     </div>
 
     <div class="toast" id="toast">Link Kopyalandı!</div>
 
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
 <script>
-    // --- SABİTLER ---
+    // --- GÜVENLİ DEĞİŞKENLER ---
     const pos = [
         {l:10, t:10}, {l:50, t:10}, {l:90, t:10},
         {l:10, t:50}, {l:50, t:50}, {l:90, t:50},
@@ -211,9 +214,8 @@
     const adj = [[1,3,4],[0,2,4],[1,5,4],[0,4,6],[0,1,2,3,5,6,7,8],[2,4,8],[3,4,7],[6,4,8],[4,5,7]];
     const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
-    // --- STATE ---
-    let mode = 'local'; // 'local' or 'online'
-    let myRole = 'both'; // 'R', 'Y', or 'both' (local)
+    let mode = 'local';
+    let myRole = 'both'; 
     let peer = null, conn = null;
     let state = {
         board: Array(9).fill(null),
@@ -224,16 +226,26 @@
         winner: null
     };
 
-    // --- INIT ---
-    window.onload = () => {
+    // --- SAYFA YÜKLENİNCE ---
+    window.addEventListener('load', () => {
+        // Yükleme ekranını kaldır
+        document.getElementById('loader').style.display = 'none';
+        
+        // Spotları oluştur
         createSpots();
-        // Eğer linkte ID varsa direkt katıl
+
+        // Buton Eventlerini Bağla (Manuel Bağlama daha güvenlidir)
+        document.getElementById('btn-local').addEventListener('click', startLocalGame);
+        document.getElementById('btn-online').addEventListener('click', () => setupOnline());
+        document.getElementById('btn-copy').addEventListener('click', copyLink);
+
+        // URL Kontrol (Davet ile mi geldi?)
         const urlParams = new URLSearchParams(window.location.search);
         const joinId = urlParams.get('id');
         if(joinId) {
             setupOnline(joinId);
         }
-    };
+    });
 
     function createSpots() {
         const board = document.getElementById('board');
@@ -248,6 +260,7 @@
 
     // --- OYUN BAŞLATMA ---
     function startLocalGame() {
+        console.log("Local game starting...");
         mode = 'local';
         myRole = 'both';
         document.getElementById('menu-layer').style.display = 'none';
@@ -257,75 +270,64 @@
     }
 
     function setupOnline(joinId = null) {
+        // PeerJS Yüklü mü Kontrolü
+        if (typeof Peer === 'undefined') {
+            alert("Online oyun için internet bağlantısı gerekli veya kütüphane yüklenemedi.");
+            return;
+        }
+
         mode = 'online';
         document.getElementById('main-btns').style.display = 'none';
         const linkArea = document.getElementById('link-area');
         const statusMsg = document.getElementById('status-msg');
-        
-        // PeerJS Config - GÜVENLİ BAĞLANTI AYARI
-        peer = new Peer(null, {
-            debug: 1,
-            secure: true // GitHub Pages için kritik!
-        });
 
-        if (!joinId) {
-            // HOST
-            linkArea.style.display = 'flex';
-            peer.on('open', (id) => {
-                const link = window.location.origin + window.location.pathname + '?id=' + id;
-                document.getElementById('share-link').value = link;
-            });
-            peer.on('connection', (c) => {
-                conn = c;
-                setupConn();
-                myRole = 'R'; // Host her zaman kırmızı
-                statusMsg.innerText = "Bağlandı! Başlıyor...";
-                setTimeout(() => {
-                    document.getElementById('menu-layer').style.display = 'none';
-                    document.getElementById('game-layer').style.display = 'flex';
-                    resetGameLogic();
-                    sendState();
-                    render();
-                }, 1000);
-            });
-            // Hata Yakalama (Timeout)
-            setTimeout(() => {
-                if(!peer.id) {
-                    alert("Sunucuya bağlanılamadı. Lütfen sayfayı yenile veya internetini kontrol et.");
-                    location.reload();
-                }
-            }, 8000);
+        try {
+            peer = new Peer(null, { debug: 1, secure: true });
 
-        } else {
-            // JOINER
-            statusMsg.style.display = 'block';
-            statusMsg.innerText = "Odaya bağlanılıyor...";
-            document.getElementById('menu-layer').appendChild(statusMsg); // Görünür bir yere al
-            
-            peer.on('open', () => {
-                conn = peer.connect(joinId);
-                setupConn();
-            });
+            if (!joinId) {
+                // HOST
+                linkArea.style.display = 'flex';
+                peer.on('open', (id) => {
+                    const link = window.location.origin + window.location.pathname + '?id=' + id;
+                    document.getElementById('share-link').value = link;
+                });
+                peer.on('connection', (c) => {
+                    handleConnection(c);
+                    myRole = 'R';
+                    statusMsg.innerText = "Bağlandı! Oyun başlıyor...";
+                    setTimeout(startGameUI, 1000);
+                });
+            } else {
+                // JOINER
+                statusMsg.style.display = 'block';
+                statusMsg.innerText = "Sunucuya bağlanılıyor...";
+                document.getElementById('menu-layer').appendChild(statusMsg);
+                
+                peer.on('open', () => {
+                    conn = peer.connect(joinId);
+                    handleConnection(conn);
+                });
+            }
             
             peer.on('error', (err) => {
-                alert("Bağlantı hatası: " + err);
-                location.href = window.location.pathname; // URL temizle
+                alert("Bağlantı Hatası: " + err);
+                location.href = window.location.pathname.split('?')[0];
             });
+
+        } catch (e) {
+            alert("Hata oluştu: " + e.message);
         }
     }
 
-    function setupConn() {
-        conn.on('open', () => {
-            console.log("Bağlantı açık");
-        });
+    function handleConnection(c) {
+        conn = c;
+        conn.on('open', () => { console.log("Connected"); });
         conn.on('data', (data) => {
             if(data.type === 'state') {
                 state = data.val;
                 if(mode === 'online' && myRole === 'both') { 
-                    // İlk veri geldiğinde rolü belirle (Joiner Sarı olur)
-                    myRole = 'Y';
-                    document.getElementById('menu-layer').style.display = 'none';
-                    document.getElementById('game-layer').style.display = 'flex';
+                    myRole = 'Y'; // İlk veriyi alan Joiner'dır
+                    startGameUI();
                 }
                 render();
             } else if (data.type === 'restart') {
@@ -334,7 +336,17 @@
                 render();
             }
         });
-        conn.on('close', () => { alert("Rakip ayrıldı!"); location.href = window.location.pathname; });
+        conn.on('close', () => { alert("Rakip ayrıldı!"); location.href = window.location.pathname.split('?')[0]; });
+    }
+
+    function startGameUI() {
+        document.getElementById('menu-layer').style.display = 'none';
+        document.getElementById('game-layer').style.display = 'flex';
+        if(myRole === 'R') {
+            resetGameLogic();
+            sendState();
+        }
+        render();
     }
 
     function sendState() {
@@ -349,9 +361,9 @@
         state.winner = null;
     }
 
-    // --- RENDER ---
+    // --- RENDER & LOGIC ---
     function render() {
-        // HUD
+        // Skor ve İsimler
         document.getElementById('p1-stat').classList.toggle('active', state.turn === 'R');
         document.getElementById('p2-stat').classList.toggle('active', state.turn === 'Y');
         document.getElementById('s1').innerText = state.score.R;
@@ -364,23 +376,21 @@
             turnText.innerText = state.turn === 'R' ? "SIRA: KIRMIZI" : "SIRA: SARI";
         }
 
-        // TAŞLAR
+        // Temizlik
         document.querySelectorAll('.piece').forEach(p => p.remove());
 
-        // Sahadaki taşlar
-        state.board.forEach((owner, i) => {
-            if(owner) createPiece(owner, i);
-        });
+        // Taşları Çiz
+        state.board.forEach((owner, i) => { if(owner) createPiece(owner, i); });
 
-        // Havuzdaki taşlar
+        // Havuzları Çiz
         const rCount = 3 - state.placed.R;
         const yCount = 3 - state.placed.Y;
         for(let i=0; i<rCount; i++) createPiece('R', -1);
         for(let i=0; i<yCount; i++) createPiece('Y', -1);
 
-        // Modal
+        // Oyun Sonu
         if(state.winner) {
-            document.getElementById('end-msg').innerText = state.winner === 'DRAW' ? "BERABERE!" : (state.winner === 'R' ? "KIRMIZI KAZANDI!" : "SARI KAZANDI!");
+            document.getElementById('end-msg').innerText = state.winner === 'DRAW' ? "BERABERE!" : (state.winner === 'R' ? "KIRMIZI KAZANDI" : "SARI KAZANDI");
             document.getElementById('end-modal').style.display = 'flex';
         }
     }
@@ -388,102 +398,51 @@
     function createPiece(owner, idx) {
         const p = document.createElement('div');
         p.className = `piece ${owner === 'R' ? 'red' : 'yellow'}`;
-        p.dataset.owner = owner;
-        p.dataset.idx = idx;
-
-        // Pozisyonlama
+        
         if(idx === -1) {
-            // Havuzda
             p.style.position = 'relative';
             document.getElementById(`pool-${owner}`).appendChild(p);
         } else {
-            // Sahada
             p.style.left = pos[idx].l + '%';
             p.style.top = pos[idx].t + '%';
             p.style.transform = 'translate(-50%, -50%)';
             document.getElementById('board').appendChild(p);
         }
 
-        // Event Listener (Sadece benim sıramsa)
-        const canMove = (mode === 'local') || (mode === 'online' && myRole === owner && state.turn === owner);
-        if(canMove && !state.winner) {
-            p.addEventListener('mousedown', dragStart);
-            p.addEventListener('touchstart', dragStart, {passive: false});
+        // Tıklanabilirlik Kontrolü
+        const isMyTurn = (mode === 'local') || (mode === 'online' && myRole === owner && state.turn === owner);
+        if(isMyTurn && !state.winner) {
+            // Mouse ve Touch eventlerini ayrı ayrı güvenli bağla
+            p.addEventListener('mousedown', (e) => startDrag(e, idx, owner));
+            p.addEventListener('touchstart', (e) => startDrag(e, idx, owner), {passive: false});
         } else {
             p.style.cursor = 'default';
         }
     }
 
-    // --- FİZİK MOTORU (Düzeltilmiş) ---
-    let dragged = null;
-    let dragData = {};
+    // --- SÜRÜKLE BIRAK (BASİTLEŞTİRİLMİŞ) ---
+    let draggedItem = null;
+    let dragOffset = {x:0, y:0};
+    let origin = {x:0, y:0, idx:-1};
 
-    function dragStart(e) {
-        const p = e.target;
-        const idx = parseInt(p.dataset.idx);
-        
-        // Faz Kontrolü
-        if(state.phase === 'moving' && idx === -1) return; // Hareket fazında havuzdan alamazsın
+    function startDrag(e, idx, owner) {
+        if(state.phase === 'moving' && idx === -1) return; // Hareket fazında havuz yasak
 
         e.preventDefault();
-        dragged = p;
-        dragged.classList.add('dragging');
-
-        const rect = p.getBoundingClientRect();
         const input = e.touches ? e.touches[0] : e;
+        const target = e.target;
         
-        dragData = {
-            startX: input.clientX,
-            startY: input.clientY,
-            origLeft: rect.left,
-            origTop: rect.top,
-            idx: idx,
-            owner: p.dataset.owner
+        draggedItem = target;
+        const rect = target.getBoundingClientRect();
+        
+        origin = {x: rect.left, y: rect.top, idx: idx};
+        dragOffset = {
+            x: input.clientX - rect.left,
+            y: input.clientY - rect.top
         };
 
-        // Taşı body'ye taşı (z-index sorunu olmasın diye)
-        p.style.position = 'fixed';
-        p.style.left = rect.left + 'px';
-        p.style.top = rect.top + 'px';
-        p.style.width = rect.width + 'px';
-        p.style.height = rect.height + 'px';
-        p.style.transform = 'none'; // Merkezleme transformunu iptal et
-        document.body.appendChild(p);
-
-        document.addEventListener('mousemove', dragging);
-        document.addEventListener('touchmove', dragging, {passive: false});
-        document.addEventListener('mouseup', dragEnd);
-        document.addEventListener('touchend', dragEnd);
-    }
-
-    function dragging(e) {
-        if(!dragged) return;
-        e.preventDefault();
-        const input = e.touches ? e.touches[0] : e;
-        const dx = input.clientX - dragData.startX;
-        const dy = input.clientY - dragData.startY;
-        
-        // Parmağın biraz üstünde göster
-        const offset = e.touches ? -60 : 0;
-        dragged.style.left = (dragData.origLeft + dx) + 'px';
-        dragged.style.top = (dragData.origTop + dy + offset) + 'px';
-    }
-
-    function dragEnd(e) {
-        if(!dragged) return;
-        
-        document.removeEventListener('mousemove', dragging);
-        document.removeEventListener('touchmove', dragging);
-        document.removeEventListener('mouseup', dragEnd);
-        document.removeEventListener('touchend', dragEnd);
-
-        dragged.classList.remove('dragging');
-        
-        // Hedef bulma
-        const droppedIdx = getDropTarget(dragged);
-        let valid = false;
-
-        if(droppedIdx !== null && state.board[droppedIdx] === null) {
-            // Mantık
-            if(state.phase === 'placing' && dragData.idx === -1) valid = true;
-            else if(state.phase === 'moving' && dragData.idx
+        // Taşı fixed moda al
+        target.style.position = 'fixed';
+        target.style.width = rect.width + 'px';
+        target.style.height = rect.height + 'px';
+        target.style.
